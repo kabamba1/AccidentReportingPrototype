@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Report Accident</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+<header>Report an Accident</header>
+
+<div class="container">
+  <label>Accident Type</label>
+  <select id="type"></select>
+
+  <label>Description</label>
+  <textarea id="description" rows="4" placeholder="Brief description of the accident..."></textarea>
+
+  <p id="locationStatus" style="font-size:14px;color:#180101;"></p>
+
+  <label>Upload Image (optional)</label>
+  <input type="file" id="image" accept="image/*"/>
+
+  <button id="submitBtn">Submit Report</button>
+  <div class="status" id="status"></div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+import { getFirestore, collection, addDoc, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-storage.js";
+
+// Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyARZDlI9qCFkJG_G7S5HhI2qzg1uMU2D6g",
+  authDomain: "ar-prototype-a9917.firebaseapp.com",
+  projectId: "ar-prototype-a9917",
+  storageBucket: "ar-prototype-a9917.appspot.com",
+  messagingSenderId: "515017953578",
+  appId: "1:515017953578:web:b9382a6d6d4fb318284e53",
+  measurementId: "G-EPE25N0XF9"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+// Accident types dropdown
+const accidentTypes = ["Vehicle Collision","Pedestrian Accident","Motorcycle Accident","Fire Incident","Medical Emergency","Theft/Crime", "Assault", "Other"];
+const typeSelect = document.getElementById("type");
+accidentTypes.forEach(type => {
+  const option = document.createElement("option");
+  option.value = type;
+  option.textContent = type;
+  typeSelect.appendChild(option);
+});
+
+// Load centers_test from Firestore
+let emergencyCenters = [];
+async function loadCenters() {
+  try {
+    const snapshot = await getDocs(collection(db, "centers_test"));
+    emergencyCenters = snapshot.docs.map(doc => doc.data());
+    console.log("Loaded test centers:", emergencyCenters);
+  } catch(e) {
+    console.error("Failed to load centers_test:", e);
+  }
+}
+await loadCenters();
+
+// Helpers
+function mapAccidentToCenterType(type) {
+  type = (type||"").toLowerCase();
+  if(type.includes("fire")) return "fire";
+  if(type.includes("vehicle") || type.includes("medical") || type.includes("motorcycle") || type.includes("pedestrian")) return "hospital";
+  if(type.includes("theft") || type.includes("assault") || type.includes("crime")) return "police";
+  return "hospital";
+}
+
+function getDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function findNearestCenter(lat, lng, accidentType) {
+  let allowedTypes = [];
+  accidentType = (accidentType || "").toLowerCase();
+  if(accidentType.includes("fire")) allowedTypes = ["fire"];
+  else if(accidentType.includes("theft") || accidentType.includes("assault") || accidentType.includes("crime")) allowedTypes = ["police"];
+  else allowedTypes = ["clinic", "hospital"];
+
+  let nearest = null;
+  let minDist = Infinity;
+
+  emergencyCenters.forEach(c => {
+    if(allowedTypes.includes(c.type)) {
+      const d = getDistance(lat, lng, c.lat, c.lng);
+      if(d < minDist) {
+        minDist = d;
+        nearest = c;
+      }
+    }
+  });
+
+  return nearest || { name: "No center found", lat, lng };
+}
+
+// Helper to format full readable address
+async function getReadableAddress(lat, lng) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`);
+    const data = await res.json();
+    const addr = data.address || {};
+    const parts = [
+      addr.road,
+      addr.suburb,
+      addr.neighbourhood,
+      addr.village,
+      addr.hamlet,
+      addr.city,
+      addr.town,
+    ].filter(Boolean);
+    let locationName = parts.join(", ");
+    if(!locationName) locationName = "Unknown area";
+    if(locationName.length > 60) locationName = locationName.slice(0, 57) + "...";
+    return locationName + ", Zambia";
+  } catch(e){
+    console.warn("Reverse geocoding failed", e);
+    return "Unknown area, Zambia";
+  }
+}
+
+// Submit button logic
+const submitBtn = document.getElementById("submitBtn");
+const statusDiv = document.getElementById("status");
+const locationStatus = document.getElementById("locationStatus");
+
+submitBtn.onclick = async () => {
+  statusDiv.innerText = "📡 Getting GPS location...";
+  submitBtn.disabled = true;
+
+  async function submitReport(lat,lng,locationName){
+    try {
+      const accidentType = typeSelect.value;
+      const nearest = findNearestCenter(lat,lng,accidentType);
+
+      // Upload image if selected
+      let imageUrl = "";
+      const file = document.getElementById("image").files[0];
+      if(file){
+        const imageRef = ref(storage, `accident_images/${Date.now()}_${file.name}`);
+        await uploadBytes(imageRef, file);
+        imageUrl = await getDownloadURL(imageRef);
+      }
+
+      await addDoc(collection(db,"reports"),{
+        type: accidentType,
+        description: document.getElementById("description").value,
+        location: { lat, lng, name: locationName },
+        nearestCenter: nearest.name,
+        imageUrl: imageUrl,
+        status: "Reported",
+        createdAt: serverTimestamp()
+      });
+
+      statusDiv.innerText = `✅ Accident reported successfully! Nearest center: ${nearest.name}`;
+      submitBtn.disabled = false;
+      document.getElementById("description").value = "";
+      document.getElementById("image").value = "";
+      locationStatus.innerText = "";
+
+    } catch(e){
+      console.error(e);
+      statusDiv.innerText = "❌ Failed to submit report.";
+      submitBtn.disabled = false;
+    }
+  }
+
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(async pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const locationName = await getReadableAddress(lat,lng);
+      locationStatus.innerText = `Location detected: ${locationName} (Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)})`;
+      await submitReport(lat,lng,locationName);
+
+    }, async err => {
+      console.warn("GPS failed:", err);
+      const fallbackLat = -15.4075;
+      const fallbackLng = 28.2876;
+      const fallbackName = "Kwame Nkrumah University, Zambia";
+      locationStatus.innerText = `⚠ Using fallback location: ${fallbackName}`;
+      await submitReport(fallbackLat, fallbackLng, fallbackName);
+    }, { enableHighAccuracy:true, timeout:30000, maximumAge:0 });
+  } else {
+    const fallbackLat = -15.4075;
+    const fallbackLng = 28.2876;
+    const fallbackName = "Kwame Nkrumah University, Zambia";
+    locationStatus.innerText = `⚠ Using fallback location: ${fallbackName}`;
+    await submitReport(fallbackLat, fallbackLng, fallbackName);
+  }
+};
+</script>
+</body>
+</html>
