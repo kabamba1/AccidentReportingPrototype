@@ -1,0 +1,183 @@
+/* ---------------- Body & Layout ---------------- */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f2f2f2;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+header {
+  background: #e53935;
+  color: #fff;
+  padding: 20px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: bold;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 20px auto;
+  gap: 20px;
+  padding: 0 10px;
+  box-sizing: border-box;
+}
+
+#map {
+  width: 100%;
+  height: 50vh;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  background: #e5e5e5;
+}
+
+#incidentPanel {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  padding: 15px;
+  max-width: 800px;
+  margin: auto;
+  overflow-y: auto;
+}
+
+#incidentPanel h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  text-align: center;
+  color: #e53935;
+  font-size: 20px;
+}
+
+/* ---------------- Incident Cards ---------------- */
+.incident {
+  background: #fafafa;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.incident:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.incident button {
+  margin-top: 8px;
+  margin-right: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.incident button:first-of-type {
+  background: #ff9800;
+  color: #fff;
+}
+
+.incident button:first-of-type:hover {
+  background: #fb8c00;
+}
+
+.incident button:last-of-type {
+  background: #9e9e9e;
+  color: #fff;
+}
+
+.incident button:last-of-type:hover {
+  background: #757575;
+}
+
+/* ---------------- Sound Prompt ---------------- */
+#soundPrompt {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+#soundPrompt div {
+  background: #fff;
+  padding: 25px;
+  border-radius: 8px;
+  text-align: center;
+  max-width: 350px;
+}
+
+#enableSoundBtn {
+  padding: 12px 25px;
+  background: #e53935;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  margin-top: 15px;
+}
+
+#enableSoundBtn:hover {
+  background: #d32f2f;
+}
+
+/* ---------------- Responsive ---------------- */
+@media (min-width:768px) {
+  .container { flex-direction: row; gap: 20px; }
+  #map { flex: 2; height: 80vh; }
+  #incidentPanel { flex: 1; margin: 0; height: 80vh; }
+}
+
+/* ---------------- Markers ---------------- */
+.marker {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+
+.marker-incident { background: #e53935; animation: pulse 1.5s infinite; }
+.marker-hospital { background: #1e88e5; }
+.marker-police { background: #3949ab; }
+.marker-fire { background: #fb8c00; }
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(229,57,53,0.6); }
+  70% { box-shadow: 0 0 0 15px rgba(229,57,53,0); }
+  100% { box-shadow: 0 0 0 0 rgba(229,57,53,0); }
+}
+
+/* ---------------- Legend ---------------- */
+.info.legend {
+  background: #fff;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.info.legend i {
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  margin-right: 5px;
+}
