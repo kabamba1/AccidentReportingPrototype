@@ -37,7 +37,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyARZDlI9qCFkJG_G7S5HhI2qzg1uMU2D6g",
   authDomain: "ar-prototype-a9917.firebaseapp.com",
   projectId: "ar-prototype-a9917",
-  storageBucket: "ar-prototype-a9917.appspot.com",
+  storageBucket: "ar-prototype-a9917.firebasestorage.app",
   messagingSenderId: "515017953578",
   appId: "1:515017953578:web:b9382a6d6d4fb318284e53",
   measurementId: "G-EPE25N0XF9"
@@ -72,11 +72,30 @@ await loadCenters();
 
 // Helpers
 function mapAccidentToCenterType(type) {
-  type = (type||"").toLowerCase();
-  if(type.includes("fire")) return "fire";
-  if(type.includes("vehicle") || type.includes("medical") || type.includes("motorcycle") || type.includes("pedestrian")) return "hospital";
-  if(type.includes("theft") || type.includes("assault") || type.includes("crime")) return "police";
-  return "hospital";
+  type = (type || "").toLowerCase();
+
+  if (type.includes("fire")) {
+    return { type: "fire", color: "#fb8c00" };
+  }
+
+  if (
+    type.includes("vehicle") ||
+    type.includes("medical") ||
+    type.includes("motorcycle") ||
+    type.includes("pedestrian")
+  ) {
+    return { type: "hospital", color: "#e53935" };
+  }
+
+  if (
+    type.includes("theft") ||
+    type.includes("assault") ||
+    type.includes("crime")
+  ) {
+    return { type: "police", color: "#1976d2" };
+  }
+
+  return { type: "hospital", color: "#e53935" };
 }
 
 function getDistance(lat1, lng1, lat2, lng2) {
@@ -144,21 +163,35 @@ submitBtn.onclick = async () => {
   statusDiv.innerText = "📡 Getting GPS location...";
   submitBtn.disabled = true;
 
-  async function submitReport(lat,lng,locationName){
+  async function submitReport(lat, lng, locationName) {
     try {
       const accidentType = typeSelect.value;
-      const nearest = findNearestCenter(lat,lng,accidentType);
+      const nearest = findNearestCenter(lat, lng, accidentType);
 
       // Upload image if selected
       let imageUrl = "";
-      const file = document.getElementById("image").files[0];
-      if(file){
+      const fileInput = document.getElementById("image");
+      const file = fileInput.files[0];
+
+      if (file) {
+        console.log("Uploading image:", file.name);
         const imageRef = ref(storage, `accident_images/${Date.now()}_${file.name}`);
-        await uploadBytes(imageRef, file);
-        imageUrl = await getDownloadURL(imageRef);
+
+        try {
+          const uploadResult = await uploadBytes(imageRef, file);
+          console.log("Upload complete:", uploadResult);
+          imageUrl = await getDownloadURL(imageRef);
+          console.log("Download URL:", imageUrl);
+        } catch (uploadErr) {
+          console.error("Image upload failed:", uploadErr);
+          statusDiv.innerText = "❌ Failed to upload image.";
+          submitBtn.disabled = false;
+          return; // stop submission if upload fails
+        }
       }
 
-      await addDoc(collection(db,"reports"),{
+      // Submit report to Firestore
+      await addDoc(collection(db, "reports"), {
         type: accidentType,
         description: document.getElementById("description").value,
         location: { lat, lng, name: locationName },
@@ -171,39 +204,78 @@ submitBtn.onclick = async () => {
       statusDiv.innerText = `✅ Accident reported successfully! Nearest center: ${nearest.name}`;
       submitBtn.disabled = false;
       document.getElementById("description").value = "";
-      document.getElementById("image").value = "";
+      fileInput.value = "";
       locationStatus.innerText = "";
 
-    } catch(e){
-      console.error(e);
+    } catch (e) {
+      console.error("Report submission failed:", e);
       statusDiv.innerText = "❌ Failed to submit report.";
       submitBtn.disabled = false;
     }
   }
 
-  if(navigator.geolocation){
+  // Get geolocation
+  if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(async pos => {
       const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
-      const locationName = await getReadableAddress(lat,lng);
+const lng = pos.coords.longitude;
+const accuracy = pos.coords.accuracy;
+
+console.log("GPS accuracy:", accuracy);
+
+// If accuracy is too poor, warn user
+if (accuracy > 1000) {
+  const proceed = confirm(
+    "⚠ Your GPS signal is weak (low accuracy).\n\nDo you still want to submit?"
+  );
+
+  if (!proceed) {
+    submitBtn.disabled = false;
+    return;
+  }
+}
+      const locationName = await getReadableAddress(lat, lng);
       locationStatus.innerText = `Location detected: ${locationName} (Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)})`;
-      await submitReport(lat,lng,locationName);
+      await submitReport(lat, lng, locationName);
 
     }, async err => {
-      console.warn("GPS failed:", err);
-      const fallbackLat = -15.4075;
-      const fallbackLng = 28.2876;
-      const fallbackName = "Kwame Nkrumah University, Zambia";
-      locationStatus.innerText = `⚠ Using fallback location: ${fallbackName}`;
-      await submitReport(fallbackLat, fallbackLng, fallbackName);
-    }, { enableHighAccuracy:true, timeout:30000, maximumAge:0 });
-  } else {
-    const fallbackLat = -15.4075;
-    const fallbackLng = 28.2876;
-    const fallbackName = "Kwame Nkrumah University, Zambia";
-    locationStatus.innerText = `⚠ Using fallback location: ${fallbackName}`;
+  console.warn("GPS failed:", err);
+
+  const fallbackLat = -14.44463;
+  const fallbackLng = 28.46799;
+  const fallbackName = "Kwame Nkrumah University, Kabwe";
+
+  // Ask user before using fallback
+  const useFallback = confirm(
+    "⚠ Unable to get your exact location.\n\nDo you want to use an approximate location instead?"
+  );
+
+  if (useFallback) {
+    locationStatus.innerText = `⚠ Using approximate location: ${fallbackName}`;
     await submitReport(fallbackLat, fallbackLng, fallbackName);
+  } else {
+    statusDiv.innerText = "❌ Please enable location or move to an open area and try again.";
+    submitBtn.disabled = false;
   }
+
+}, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+  } else {
+  const fallbackLat = -14.44463;
+  const fallbackLng = 28.46799;
+  const fallbackName = "Kwame Nkrumah University, Kabwe";
+
+  const useFallback = confirm(
+    "⚠ Your device does not support GPS.\n\nDo you want to use an approximate location instead?"
+  );
+
+  if (useFallback) {
+    locationStatus.innerText = `⚠ Using approximate location: ${fallbackName}`;
+    await submitReport(fallbackLat, fallbackLng, fallbackName);
+  } else {
+    statusDiv.innerText = "❌ Cannot get your location. Please use a GPS-enabled device.";
+    submitBtn.disabled = false;
+  }
+}
 };
 </script>
 </body>

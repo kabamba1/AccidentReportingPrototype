@@ -28,224 +28,186 @@ const db = getFirestore(app);
 
 // 📌 DATASET
 const centers = [
-  // ===================== Lusaka Province =====================
-
-  // 🔴 Police Stations
-  {
-    name: "Lusaka Central Police Station",
-    type: "police",
-    lat: -15.41594,
-    lng: 28.28660
-  },
-  {
-    name: "Police Post - Lusaka Province",
-    type: "police",
-    lat: -15.26691,
-    lng: 28.42045
-  },
-
-  // 🔥 Fire Stations
-  {
-    name: "Lusaka Central Fire Station",
-    type: "fire",
-    lat: -15.41456,
-    lng: 28.28823
-  },
-
-  // 🏥 Hospitals & Clinics (verified + user-provided)
-  {
-    name: "University Teaching Hospital (UTH)",
-    type: "hospital",
-    lat: -15.43291,
-    lng: 28.31402
-  },
-  {
-    name: "UNZA Health Clinic",
-    type: "clinic",
-    lat: -15.39215,
-    lng: 28.32625
-  },
-  {
-    name: "Lusaka Clinic",
-    type: "clinic",
-    lat: -15.39303,
-    lng: 28.36203
-  },
-  {
-    name: "Clinic (Great East Road)",
-    type: "clinic",
-    lat: -15.33931,
-    lng: 28.66858
-  },
-  {
-    name: "Lusaka Adventist Clinic",
-    type: "clinic",
-    lat: -15.42251,
-    lng: 28.29537
-  },
-  {
-    name: "Chawama 1st Level Hospital",
-    type: "hospital",
-    lat: -15.46169301,
-    lng: 28.28289296
-  },
-  {
-    name: "Chelstone 1st Level Hospital",
-    type: "hospital",
-    lat: -15.36766532,
-    lng: 28.38329692
-  },
-  {
-    name: "Chilenje 1st Level Hospital",
-    type: "hospital",
-    lat: -15.44884,
-    lng: 28.3376
-  },
-  {
-    name: "Chipata 1st Level Hospital",
-    type: "hospital",
-    lat: -15.370334,
-    lng: 28.294195
-  },
-  {
-    name: "Matero 1st Level Hospital",
-    type: "hospital",
-    lat: -15.37282778,
-    lng: 28.26445361
-  },
-  {
-    name: "Bauleni Mini Hospital",
-    type: "hospital",
-    lat: -15.44684775,
-    lng: 28.37350943
-  },
-  {
-    name: "Chainama Hills Hospital (Level 2)",
-    type: "hospital",
-    lat: -15.38993152,
-    lng: 28.35571546
-  },
-  {
-    name: "Plus Sikanze Police Hospital",
-    type: "hospital",
-    lat: -15.42336499,
-    lng: 28.30315317
-  },
-
   // ===================== Central Province =====================
 
   // 🔴 Police Stations (approximated)
   {
     name: "Kabwe Central Police Station",
     type: "police",
-    lat: -14.43662,
-    lng: 28.44444
+    lat: -14.43640,
+    lng: 28.44460
   },
   {
-    name: "Mumbwa Police Post",
+    name: "Kabwe Kasanda Police Station",
     type: "police",
-    lat: -14.98764,
-    lng: 27.06322
+    lat: -14.44660,
+    lng: 28.43176
+  },
+  {
+    name: "Chowa Police Station",
+    type: "police",
+    lat: -14.45257,
+    lng: 28.44909
+  },
+  {
+    name: "Bwacha Police Station",
+    type: "police",
+    lat: -14.40312,
+    lng: 28.44345
+  },
+  {
+    name: "Mumbwa District Police Station",
+    type: "police",
+    lat: -14.98255,
+    lng: 27.06078
   },
   {
     name: "Kapiri Mposhi Police Station",
     type: "police",
-    lat: -13.9810,
-    lng: 28.6520
+    lat: -13.97836,
+    lng: 28.68325
   },
   {
     name: "Mkushi Police Station",
     type: "police",
-    lat: -14.5725,
-    lng: 29.4182
+    lat: -13.62647,
+    lng: 29.39477
   },
   {
     name: "Serenje Police Station",
     type: "police",
-    lat: -14.0310,
-    lng: 29.1829
+    lat: -13.24490,
+    lng: 30.23781
   },
   {
     name: "Chibombo Police Station",
     type: "police",
-    lat: -14.6840,
-    lng: 28.1000
+    lat: -14.65772,
+    lng: 28.07179
   },
   {
     name: "Chisamba Police Station",
     type: "police",
-    lat: -15.1530,
-    lng: 28.1910
+    lat: -14.98780,
+    lng: 28.37853
   },
 
   // 🔥 Fire Stations (approximated)
   {
     name: "Kabwe Fire Station",
     type: "fire",
-    lat: -14.43561,
-    lng: 28.45149
-  },
-  {
-    name: "Mumbwa Fire Station",
-    type: "fire",
-    lat: -14.9870,
-    lng: 27.0640
+    lat: -14.43576,
+    lng: 28.45146
   },
   {
     name: "Kapiri Mposhi Fire Station",
     type: "fire",
-    lat: -13.9820,
-    lng: 28.6510
+    lat: -13.97094,
+    lng: 28.680501
   },
   {
-    name: "Mkushi Fire Station",
+    name: "Mkushi Fire Brigade",
     type: "fire",
-    lat: -14.5730,
-    lng: 29.4170
+    lat: -13.62342,
+    lng: 29.39208
   },
   {
-    name: "Serenje Fire Station",
+    name: "Serenje Fire Brigade",
     type: "fire",
-    lat: -14.0320,
-    lng: 29.1830
+    lat: -13.24106,
+    lng: 30.23655
   },
 
   // 🏥 Hospitals (verified)
   {
-    name: "Kabwe General Hospital",
+    name: "Kabwe Central Hospital",
     type: "hospital",
-    lat: -14.4437,
-    lng: 28.4522
+    lat: -14.43451,
+    lng: 28.42946
+  },
+  {
+    name: "Railway Surgery Health Centre",
+    type: "hospital",
+    lat: -14.44777,
+    lng: 28.44206
+  },
+   {
+    name: "Providence Medical Centre",
+    type: "hospital",
+    lat: -14.43876,
+    lng: 28.44111
+  },
+   {
+    name: "Mela Medical Centre",
+    type: "hospital",
+    lat: -14.43829,
+    lng: 28.45695
+  },
+  {
+    name: "Mine Hospital",
+    type: "hospital",
+    lat: -14.44837,
+    lng: 28.43913
+  },
+   {
+    name: "Mahatma Gandhi Memorial clinic",
+    type: "hospital",
+    lat: -14.43536,
+    lng: 28.46168
+  },
+   {
+    name: "Kabwe Trust Clinic",
+    type: "hospital",
+    lat: -14.43495,
+    lng: 28.43239
+  },
+   {
+    name: "Pollen Health Center",
+    type: "hospital",
+    lat: -14.44117,
+    lng: 28.46289
   },
   {
     name: "Kabwe Women and Newborn Hospital",
     type: "hospital",
-    lat: -14.4470,
-    lng: 28.4508
+    lat: -14.44837,
+    lng: 28.43904
+  },
+   {
+    name: "Bwacha Health Center",
+    type: "hospital",
+    lat: -14.40807,
+    lng: 28.44052
   },
   {
     name: "Serenje District Hospital",
     type: "hospital",
-    lat: -14.0310,
-    lng: 29.1829
+    lat: -13.23518,
+    lng: 30.23475
   },
   {
     name: "Mkushi District Hospital",
     type: "hospital",
-    lat: -14.5725,
-    lng: 29.4182
+    lat: -13.61174,
+    lng: 29.38447
   },
   {
-    name: "Mumbwa General Hospital",
+    name: "Mumbwa District Hospital",
     type: "hospital",
-    lat: -14.2148,
-    lng: 27.2376
+    lat: -14.97621,
+    lng: 27.05286
   },
   {
     name: "Kapiri Mposhi District Hospital",
     type: "hospital",
-    lat: -13.9790,
-    lng: 28.6521
+    lat: -13.89654,
+    lng: 28.67037
+  },
+  {
+    name: "Kapiri Mposhi Ubarn Clinic",
+    type: "hospital",
+    lat: -13.96631,
+    lng: 28.67770
   }
 ];
 

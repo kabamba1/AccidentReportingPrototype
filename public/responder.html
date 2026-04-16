@@ -5,12 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Responder's Dashboard</title>
 
-<!-- Leaflet CSS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="Responder.css">
 
+<style>
+  #map { width: 100%; height: 500px; }
+  .incident { border: 1px solid #ccc; padding: 8px; margin-bottom: 8px; border-radius: 6px; }
+</style>
 </head>
 <body>
 
@@ -24,6 +25,57 @@
   </div>
 </div>
 
+<div class="responder-filter">
+  <label for="responderType"><strong>Select Responder Type:</strong></label>
+  <select id="responderType">
+    <option value="fire">Fire Station</option>
+    <option value="hospital">Hospital</option>
+    <option value="police">Police/RTSA</option>
+  </select>
+</div>
+
+<style>
+.responder-filter {
+  margin: 15px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: #f5f5f5;
+  padding: 10px 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  max-width: 350px;
+  font-family: Arial, sans-serif;
+}
+
+.responder-filter label {
+  font-weight: 600;
+  color: #333;
+}
+
+.responder-filter select {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  font-size: 14px;
+  transition: border 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+
+.responder-filter select:hover {
+  border-color: #1976d2;
+  box-shadow: 0 0 5px rgba(25, 118, 210, 0.3);
+}
+
+.responder-filter select:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 5px rgba(25, 118, 210, 0.5);
+}
+</style>
+
 <div class="container">
   <div id="map"></div>
   <div id="incidentPanel">
@@ -33,262 +85,226 @@
 
 <audio id="beep" src="beep.mp3" preload="auto"></audio>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB-ss5nbuztXH57iKQpqA9Slt-IfvtijjI"></script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, doc, updateDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, updateDoc, query, getDocs } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 
-// ---------------------- Firebase config ----------------------
+// ---------------- Firebase ----------------
 const firebaseConfig = {
-  apiKey: "AIzaSyARZDlI9qCFkJG_G7S5HhI2qzg1uMU2D6g",
+  apiKey: "AIzaSyB-ss5nbuztXH57iKQpqA9Slt-IfvtijjI",
   authDomain: "ar-prototype-a9917.firebaseapp.com",
   projectId: "ar-prototype-a9917",
-  storageBucket: "ar-prototype-a9917.appspot.com",
+  storageBucket: "ar-prototype-a9917.firebasestorage.app",
   messagingSenderId: "515017953578",
-  appId: "1:515017953578:web:b9382a6d6d4fb318284e53",
-  measurementId: "G-EPE25N0XF9"
+  appId: "1:515017953578:web:b9382a6d6d4fb318284e53"
 };
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// ---------------------- Map setup ----------------------
-const map = L.map("map").setView([-15.4,28.3], 7);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution:"&copy; OpenStreetMap contributors" }).addTo(map);
-setTimeout(()=>map.invalidateSize(),300);
+// ---------------- Google Map ----------------
+let map, directionsService;
+const routeRenderers = {};
+const markerLayer = [];
 
-// Elements
-const incidentList = document.getElementById("incidentList");
+function initMap() {
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: { lat: -15.4, lng: 28.3 },
+    zoom: 7
+  });
+  directionsService = new google.maps.DirectionsService();
+}
+initMap();
+
+// ---------------- Sound ----------------
 const beep = document.getElementById("beep");
 const soundPrompt = document.getElementById("soundPrompt");
-let initialized = false;
+let soundEnabled = false;
 
-// Enable sound
-document.getElementById("enableSoundBtn").addEventListener("click",()=>{
-  beep.play().then(()=>{ beep.pause(); beep.currentTime=0; }).catch(()=>{});
-  soundPrompt.style.display="none";
-  initialized=false;
+document.getElementById("enableSoundBtn").addEventListener("click", () => {
+  beep.volume = 0;
+  beep.play().then(() => {
+    beep.pause();
+    beep.currentTime = 0;
+    beep.volume = 1;
+    soundEnabled = true;
+  }).catch(err => console.log("Audio init failed:", err));
+  soundPrompt.style.display = "none";
 });
 
-// ---------------------- Centers array ----------------------
+function playAlert() {
+  if (!soundEnabled) return;
+  const sound = beep.cloneNode();
+  sound.play().catch(err => console.log("Playback blocked:", err));
+}
+
+// ---------------- Centers ----------------
 let centers = [];
 
-// ---------------------- Helpers ----------------------
-function mapAccidentToCenterType(type){
-  type = (type||"").toLowerCase();
-  if(type.includes("fire")) return "fire";
-  if(type.includes("medical") || type.includes("vehicle") || type.includes("motorcycle") || type.includes("pedestrian")) return "hospital";
-  if(type.includes("theft") || type.includes("assault") || type.includes("crime")) return "police";
-  return "hospital";
-}
-
-function zoomToIncidentAndCenter(incidentLatLng, centerLatLng) {
-  const bounds = L.latLngBounds([
-    incidentLatLng,
-    centerLatLng
-  ]);
-
-  map.fitBounds(bounds, {
-    padding: [80, 80],
-    maxZoom: 14,
-    animate: true
-  });
-}
-
-
-function getDistance(lat1,lng1,lat2,lng2){
-  const R=6371;
-  const dLat=(lat2-lat1)*Math.PI/180;
-  const dLng=(lng2-lng1)*Math.PI/180;
-  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R*(2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
-}
-
-function getNearestCenter(lat,lng,accidentType){
-  const allowedTypes = mapAccidentToCenterType(accidentType)=== "hospital" ? ["hospital","clinic"] : [mapAccidentToCenterType(accidentType)];
-  let nearest=null, minDist=Infinity;
-  centers.forEach(c=>{
-    if(allowedTypes.includes(c.type)){
-      const d=getDistance(lat,lng,c.lat,c.lng);
-      if(d<minDist){ minDist=d; nearest=c; }
-    }
-  });
-  return nearest || { name:"No center found", lat,lng, type:allowedTypes[0] };
-}
-
-function formatZambiaTime(ts){
-  if(!ts) return "Unknown time";
-  const date = ts.toDate ? ts.toDate() : new Date(ts);
-  return date.toLocaleString("en-ZM",{ timeZone:"Africa/Lusaka", year:"numeric", month:"short", day:"numeric", hour:"2-digit", minute:"2-digit", second:"2-digit" });
-}
-
-function createIcon(type){
-  let iconClass="fa-circle-info", markerClass="marker-incident";
-  if(type==="hospital"){ iconClass="fa-hospital"; markerClass="marker-hospital"; }
-  if(type==="police"){ iconClass="fa-shield-halved"; markerClass="marker-police"; }
-  if(type==="fire"){ iconClass="fa-fire-extinguisher"; markerClass="marker-fire"; }
-  if(type==="clinic"){ iconClass="fa-hospital"; markerClass="marker-hospital"; }
-  return L.divIcon({ className:"", html:`<div class="marker ${markerClass}"><i class="fa-solid ${iconClass}"></i></div>`, iconSize:[34,34], iconAnchor:[17,17], popupAnchor:[0,-18] });
-}
-
-// ---------------------- Layers ----------------------
-const markerLayer = L.layerGroup().addTo(map);
-let routingLayers = []; // store active routes
-
-// ---------------------- Color-coded routing ----------------------
-const incidentColors = { medical:"#e53935", fire:"#fb8c00", police:"#1976d2" };
-function drawRoutingRoute(center, incident){
-  const exists = routingLayers.some(r=>r.incidentId===incident.id && r.centerName===center.name);
-  if(exists) return;
-  const color = incidentColors[incident.type] || "#e53935";
-  const route = L.Routing.control({
-    waypoints:[ L.latLng(center.lat,center.lng), L.latLng(incident.lat,incident.lng) ],
-    routeWhileDragging:false, addWaypoints:false, draggableWaypoints:false,
-    fitSelectedRoutes:false, show:false,
-    lineOptions:{ styles:[{ color, weight:5 }] },
-    createMarker:()=>null
-  }).addTo(map);
-  routingLayers.push({ control:route, incidentId:incident.id, centerName:center.name });
-}
-
-// Remove routes for attended incident
-function markIncidentAttended(incidentId){
-  const toRemove = routingLayers.filter(r=>r.incidentId===incidentId);
-  toRemove.forEach(r=>map.removeControl(r.control));
-  routingLayers = routingLayers.filter(r=>r.incidentId!==incidentId);
-}
-
-// ---------------------- Firestore helpers ----------------------
-window.markAttended = async id=>{ try{ await updateDoc(doc(db,"reports",id),{status:"Attended"}); markIncidentAttended(id); }catch(e){console.error(e);} };
-window.archiveIncident = async id=>{ try{ await updateDoc(doc(db,"reports",id),{status:"Archived"}); markIncidentAttended(id); }catch(e){console.error(e);} };
-
-// ---------------------- Format full address function ----------------------
-function formatFullAddress(location) {
-  if (!location) return "Unknown location";
-
-  const addr = location.address || {};
-  const parts = [
-    addr.road,
-    addr.suburb,
-    addr.neighbourhood,
-    addr.village,
-    addr.hamlet,
-    addr.city,
-    addr.town,
-    addr.state,
-  ].filter(Boolean);
-
-  let name = parts.join(", ");
-
-  if (!name) name = location.name || "Unknown location";
-
-  // Avoid duplicate Zambia
-  if (!name.toLowerCase().includes("zambia")) {
-    name += ", Zambia";
-  }
-
-  if (name.length > 70) name = name.slice(0, 67) + "...";
-
-  return name;
-}
-
-
-// ---------------------- Legend ----------------------
-const legend = L.control({position:'bottomright'});
-legend.onAdd = function(map){
-  const div=L.DomUtil.create('div','info legend');
-  div.innerHTML="<h4>Incident Types</h4>";
-  for(let key in incidentColors){
-    div.innerHTML+=`<i style="background:${incidentColors[key]}"></i>${key}<br>`;
-  }
-  return div;
-};
-legend.addTo(map);
-
-// ---------------------- Initialize ----------------------
-async function init(){
-  // Load centers
-  try{
-    const snap = await getDocs(collection(db,"centers_test"));
-    centers = snap.docs.map(d=>({ id:d.id, ...d.data() }));
-  }catch(e){ console.error(e); }
-
-  // Listen to reported incidents
-  const reportedQuery = query(collection(db,"reports"), where("status","==","Reported"));
-  onSnapshot(reportedQuery, snapshot=>{
-    let newIncident = null;
-    markerLayer.clearLayers();
-    routingLayers.forEach(r=>{ try{ map.removeControl(r.control); }catch(e){} });
-    routingLayers=[];
-
-    incidentList.innerHTML="<h3>Reported Incidents</h3>";
-    if(snapshot.empty){ incidentList.innerHTML+="<p>No incidents reported.</p>"; return; }
-
-  snapshot.docChanges().forEach(change => {
-  if (change.type === "added" && initialized) {
-    const d = change.doc.data();
-    if (d.location?.lat && d.location?.lng) {
-      newIncident = {
-        id: change.doc.id,
-        lat: parseFloat(d.location.lat),
-        lng: parseFloat(d.location.lng),
-        type: d.type || "Other"
-      };
-    }
-  }
+// ---------------- Dropdown ----------------
+let responderType = document.getElementById("responderType").value;
+document.getElementById("responderType").addEventListener("change", () => {
+  responderType = document.getElementById("responderType").value;
+  loadReports(responderType);
 });
 
-    snapshot.forEach(docSnap=>{
-      const d=docSnap.data();
-      if(!d.location?.lat||!d.location?.lng) return;
-      const lat=parseFloat(d.location.lat), lng=parseFloat(d.location.lng);
-      if(isNaN(lat)||isNaN(lng)) return;
-
-      const nearest=getNearestCenter(lat,lng,d.type||"Other");
-
-      L.marker([lat,lng],{icon:createIcon("incident")}).addTo(markerLayer)
-       .bindPopup(`<strong>${d.type||"Accident"}</strong><br>${formatFullAddress(d.location)}<br>${d.description||""}`);
-
-      L.marker([nearest.lat,nearest.lng],{icon:createIcon(nearest.type)}).addTo(markerLayer);
-
-      drawRoutingRoute(nearest, { id:docSnap.id, lat,lng, type:mapAccidentToCenterType(d.type) });
-
-      incidentList.innerHTML+=`
-        <div class="incident">
-          <strong>${d.type||"Accident"}</strong><br>
-          Status: ${d.status}<br>
-          Location: ${formatFullAddress(d.location)}<br>
-          Nearest Center: ${nearest.name}<br>
-          Time: ${formatZambiaTime(d.createdAt)}<br>
-          Description: ${d.description||""}<br>
-          Lat: ${lat}, Lng: ${lng}<br>
-          <button onclick="markAttended('${docSnap.id}')">Mark Attended</button>
-          <button onclick="archiveIncident('${docSnap.id}')">Archive</button>
-        </div>
-      `;
-    });
-
-    if (newIncident) {
-  const nearest = getNearestCenter(
-    newIncident.lat,
-    newIncident.lng,
-    newIncident.type
-  );
-
-  zoomToIncidentAndCenter(
-    [newIncident.lat, newIncident.lng],
-    [nearest.lat, nearest.lng]
-  );
-
-  beep.currentTime = 0;
-  beep.play().catch(()=>{});
+// ---------------- Color mapping ----------------
+function mapAccidentToCenterType(type) {
+  type = (type || "").toLowerCase();
+  if (type.includes("fire")) return { type: "fire", color: "#fb8c00" };
+  if (type.includes("medical") || type.includes("vehicle") || type.includes("motorcycle") || type.includes("pedestrian")) return { type: "hospital", color: "#e53935" };
+  if (type.includes("theft") || type.includes("assault") || type.includes("crime")) return { type: "police", color: "#1976d2" };
+  return { type: "police", color: "#1976d2" };
 }
 
+// ---------------- Distance & nearest center ----------------
+function getDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+}
 
-  
-    initialized=true;
-  }, error=>{ console.error(error); });
+function getNearestCenter(lat, lng, accidentType) {
+  const requiredType = (accidentType || "").toLowerCase();
+  let nearest = null, minDist = Infinity;
+  centers.forEach(c => {
+    const centerType = (c.type || "").toLowerCase();
+    const isPolice = centerType.includes("police");
+    const isHospital = centerType.includes("hospital") || centerType.includes("clinic");
+    const isFire = centerType.includes("fire");
+    let match = false;
+    if (requiredType === "police" && isPolice) match = true;
+    if (requiredType === "hospital" && isHospital) match = true;
+    if (requiredType === "fire" && isFire) match = true;
+    if (match) {
+      const d = getDistance(lat, lng, c.lat, c.lng);
+      if (d < minDist) { minDist = d; nearest = c; }
+    }
+  });
+  return nearest;
+}
+
+// ---------------- Route Drawing ----------------
+function drawRoute(center, incident, typeInfo, incidentId) {
+  const color = typeInfo?.color || "#e53935";
+  const renderer = new google.maps.DirectionsRenderer({
+    suppressMarkers: true,
+    polylineOptions: { strokeColor: color, strokeWeight: 5 }
+  });
+  renderer.setMap(map);
+  directionsService.route({
+    origin: { lat: center.lat, lng: center.lng },
+    destination: { lat: incident.lat, lng: incident.lng },
+    travelMode: google.maps.TravelMode.DRIVING
+  }, (result, status) => {
+    if (status === "OK") renderer.setDirections(result), routeRenderers[incidentId] = renderer;
+  });
+}
+
+// ---------------- Markers ----------------
+function clearMarkers() { markerLayer.forEach(m => m.setMap(null)); markerLayer.length = 0; }
+function addMarker(lat, lng, title, type, isCenter=false) {
+  let color = "#1976d2";
+  if (type === "fire") color = "#fb8c00";
+  else if (type === "hospital") color = "#e53935";
+  const scale = isCenter ? 14 : 10;
+  const marker = new google.maps.Marker({
+    position: { lat, lng },
+    map,
+    title,
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale,
+      fillColor: color,
+      fillOpacity: 0.9,
+      strokeWeight: 1,
+      strokeColor: "#000"
+    }
+  });
+  markerLayer.push(marker);
+  return marker;
+}
+
+// ---------------- Firestore helpers ----------------
+window.markAttended = async id => { try { await updateDoc(doc(db,"reports",id), { status:"Attended" }); } catch(e){ alert(e.message); } };
+window.archiveIncident = async id => { try { await updateDoc(doc(db,"reports",id), { status:"Archived" }); } catch(e){ alert(e.message); } };
+
+// ---------------- Initialize ----------------
+async function init() {
+  try {
+    const snap = await getDocs(collection(db,"centers_test"));
+    centers = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+  } catch(e) { console.error(e); }
+  loadReports(responderType);
+}
+
+// ---------------- Load Reports ----------------
+const alertedIncidents = new Set(); // track which incidents already beeped
+async function loadReports(responderType) {
+  const reportedQuery = query(collection(db,"reports"));
+  onSnapshot(reportedQuery, snapshot => {
+    clearMarkers();
+    const incidentList = document.getElementById("incidentList");
+
+    let headerLabel = "";
+    if (responderType === "fire") headerLabel = "Fire Incidents";
+    else if (responderType === "hospital") headerLabel = "Medical Incidents";
+    else if (responderType === "police") headerLabel = "Police/RTSA Incidents";
+
+    incidentList.innerHTML = `<h3>${headerLabel}</h3>`;
+    if (snapshot.empty) { incidentList.innerHTML += "<p>No incidents reported.</p>"; return; }
+
+    snapshot.forEach(docSnap => {
+      const d = docSnap.data();
+      if (d.status === "Archived") return;
+      if (!d.location?.lat || !d.location?.lng) return;
+
+      const info = mapAccidentToCenterType(d.type);
+      if (info.type !== responderType) return;
+
+      const lat = parseFloat(d.location.lat);
+      const lng = parseFloat(d.location.lng);
+      if (isNaN(lat) || isNaN(lng)) return;
+
+      const nearest = getNearestCenter(lat, lng, info.type);
+
+      addMarker(lat, lng, d.type || "Incident", info.type);
+      if (nearest) addMarker(nearest.lat, nearest.lng, nearest.name, nearest.type, true);
+
+      if (d.status === "Reported" && !routeRenderers[docSnap.id])
+        drawRoute(nearest, { lat, lng }, info, docSnap.id);
+
+      if ((d.status !== "Reported") && routeRenderers[docSnap.id]) {
+        routeRenderers[docSnap.id].setMap(null);
+        delete routeRenderers[docSnap.id];
+      }
+
+      const nearestName = nearest ? nearest.name : "Unknown";
+
+      incidentList.innerHTML += `
+        <div class="incident">
+          <strong>${d.type || "Accident"}</strong><br>
+          Status: ${d.status}<br>
+          Location: ${d.location.name || "Unknown"}<br>
+          Nearest Center: ${nearestName}<br>
+          Description: ${d.description || ""}<br>
+          Lat: ${lat}, Lng: ${lng}<br>
+          ${d.imageUrl ? `<img src="${d.imageUrl}" style="width:180px;border-radius:8px;margin-top:8px;">` : ""}
+          <button onclick="markAttended('${docSnap.id}')" ${d.status === "Attended" ? "disabled" : ""}>Mark Attended</button>
+          <button onclick="archiveIncident('${docSnap.id}')" ${d.status !== "Attended" ? "disabled" : ""}>Archive</button>
+        </div>
+      `;
+
+      // Play beep only for newly reported incidents
+      if (d.status === "Reported" && !alertedIncidents.has(docSnap.id)) {
+        playAlert();
+        alertedIncidents.add(docSnap.id);
+      }
+    });
+  });
 }
 
 init();

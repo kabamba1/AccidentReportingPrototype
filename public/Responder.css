@@ -7,6 +7,46 @@ body {
   flex-direction: column;
   min-height: 100vh;
 }
+/*select responder*/
+.responder-filter {
+  margin: 15px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: #f5f5f5;
+  padding: 10px 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  max-width: 350px;
+  font-family: Arial, sans-serif;
+}
+
+.responder-filter label {
+  font-weight: 600;
+  color: #333;
+}
+
+.responder-filter select {
+  flex: 1;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  font-size: 14px;
+  transition: border 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+
+.responder-filter select:hover {
+  border-color: #1976d2;
+  box-shadow: 0 0 5px rgba(25, 118, 210, 0.3);
+}
+
+.responder-filter select:focus {
+  outline: none;
+  border-color: #1976d2;
+  box-shadow: 0 0 5px rgba(25, 118, 210, 0.5);
+}
 
 header {
   background: #e53935;
